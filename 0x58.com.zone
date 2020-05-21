@@ -1,0 +1,58 @@
+$ORIGIN 0x58.com.       ; default zone domain
+$TTL 1h                 ; default time to live
+
+@ 1d IN SOA a.ns.0x58.com. hostmaster.0x58.com. (
+    2020042500 	; Serial number
+    16384 	; Refresh
+    2048 	; Retry
+    1048576 	; Expiration
+    2560 	; Min TTL
+    )
+@       IN  NS      a.ns
+@       IN  NS      b.ns
+@       IN  MX      0 butler
+@       IN  A       158.69.153.30
+@       IN  AAAA    2607:5300:0203:162f::1
+@       IN  TXT     "v=spf1 redirect=butler.0x58.com"
+@       IN  TXT     "google-site-verification=WSK9Bx-4iafshjRW8C2NncLtNtRohgpKC0kNkol5Aw4"
+@       IN  TXT     "keybase-site-verification=qkzomMGjJmQstvC7q71JJLb9uZDLT17BLaG5Dx2VAmY"
+a.ns    IN  A       158.69.153.28
+a.ns    IN  AAAA    2607:5300:0203:162f::53:61
+b.ns    IN  A       158.69.153.29
+b.ns    IN  AAAA    2607:5300:0203:162f::53:62
+strida  IN  A       144.217.78.47
+strida  IN  AAAA    2607:5300:0203:162f::
+strida  IN  AAAA    2607:5300:0203:162f::58
+butler  IN  A       158.69.153.31
+butler  IN  AAAA	2607:5300:0203:162f::25
+butler  IN  MX      0 butler
+butler  IN  TXT     "v=spf1 mx a:strida.0x58.com -all exp=explain._spf.0x58.com."
+2020._domainkey.butler IN TXT (
+  "v=DKIM1; p="
+  "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvjpdgHU6DGN2jD9dRE4k"
+  "erSflnpiFxXX2NpnQ29TD9bmioCZJ22BGSEZ4k7rPVH+MWmv4GeGPRbTV67sdbJt"
+  "bGV8g6gRS5TJ4VyygbeGPqEUQgzEb2Vo+IwCbqO+NkKD2NBImx/hytxh43VI5+7p"
+  "9mQjAcrCk6ODXRbo/GRRCwq2U82F4HAGQT6P3tk5nsw2fTQFLcCofEj3hBrKbbZJ"
+  "LGzybyBYMxD5didih+yzA4XWGG7ERvhMdLJIu9Na12c9P9f8nvhlYdON1dmm3E7B"
+  "UxrRB236MU99kpkI3jSWZBu9zFxbDG4jwtpqLlQSPYwI1Ls5ywO/5XkZLL1PuIHp"
+  "HwIDAQAB")
+irc     IN  NS      ns1.digitalocean.com.
+irc     IN  NS      ns2.digitalocean.com.
+irc     IN  NS      ns3.digitalocean.com.
+*       IN  A	    158.69.153.30
+*       IN  AAAA    2607:5300:0203:162f::1
+2020._domainkey IN TXT (
+  "v=DKIM1; p="
+  "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAunAid8GprjlVf5DkLP55"
+  "hrg5/FKMw+80RjI2UU3B1IHsQObLyIbd7kb4x/YtyMvnl1FyL+aCjydLU9DWYxF0"
+  "O1N0Z46iRdl2wQMIT/k1AGxLxOaNGCdLkpiQi4I/v0/JKemDyVI+AuRpFQAA67xE"
+  "E1IqyLRHZHECAX2qh/ADemM9U85IkZW1908qtpM7x+unsU7b7ItHl8TSTqPvh1ep"
+  "93qIUAxzAq4yKkWTr5no6x7pyYmASNeJ/suA+oLrFRVRDVx6nJdm7lHuFF0n/jKP"
+  "pBSuhUSVBACJC4EVHBhdZbPygv9PrRuHZZFxmYSyt1KYR3/dWKGyFnMA82yUYqec"
+  "yQIDAQAB")
+_submission._tcp    IN  SRV 0 1 587 butler
+_submissions._tcp   IN  SRV 0 1 465 butler
+_imaps._tcp         IN  SRV 0 1 993 butler
+_imap._tcp          IN  SRV 10 1 143 butler
+explain._spf IN TXT "%{i} is not one of the %{d}'s designated mail servers.'"
+_dmarc IN TXT "v=DMARC1; p=none; sp=quarantine;"
