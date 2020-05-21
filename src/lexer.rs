@@ -187,7 +187,7 @@ impl<'a> Lexer<'a> {
                         return Err("Unexpected control character found");
                     }
                     Some(ch) if !ch.is_whitespace() => {
-                        Self::push_to_str(&mut chars, *ch);
+                        Self::push_to_str(&mut chars, *ch)?;
                         self.next();
                     }
                     Some(ch) if ch.is_whitespace() => {
@@ -212,7 +212,7 @@ impl<'a> Lexer<'a> {
                 },
                 State::Origin => match ch {
                     Some(ch) if !ch.is_control() && !ch.is_whitespace() => {
-                        Self::push_to_str(&mut chars, *ch);
+                        Self::push_to_str(&mut chars, *ch)?;
                         self.next();
                     }
                     None | Some('\r') | Some('\n') | Some(_) => {
@@ -235,7 +235,7 @@ impl<'a> Lexer<'a> {
                         return Err("Unexpected control character found");
                     }
                     Some(ch) => {
-                        Self::push_to_str(&mut chars, *ch);
+                        Self::push_to_str(&mut chars, *ch)?;
                         self.next();
                     }
                 },
@@ -268,8 +268,11 @@ impl<'a> Lexer<'a> {
         self.charno += 1;
     }
 
-    fn push_to_str(chars: &mut Option<String>, ch: char) {
-        chars.as_mut().unwrap().push(ch);
+    fn push_to_str(chars: &'_ mut Option<String>, ch: char) -> Result<(), &'a str> {
+        chars.as_mut().ok_or_else(|| "chars is None".into()).and_then(|s| {
+            s.push(ch);
+            Ok(())
+        })
     }
 }
 
@@ -278,20 +281,19 @@ mod tests {
     use super::*;
 
     #[test]
-    #[should_panic]
     fn push_to_str_none() {
         let mut chars: Option<String> = None;
 
-        Lexer::push_to_str(&mut chars, 'a');
+        assert_eq!(Lexer::push_to_str(&mut chars, 'a'), Err("chars is None"));
     }
 
     #[test]
     fn push_to_str() {
         let mut chars: Option<String> = Some(String::from("test"));
 
-        Lexer::push_to_str(&mut chars, 'i');
-        Lexer::push_to_str(&mut chars, 'n');
-        Lexer::push_to_str(&mut chars, 'g');
+        assert_eq!(Lexer::push_to_str(&mut chars, 'i'), Ok(()));
+        assert_eq!(Lexer::push_to_str(&mut chars, 'n'), Ok(()));
+        assert_eq!(Lexer::push_to_str(&mut chars, 'g'), Ok(()));
         assert_eq!(chars.unwrap(), "testing");
     }
 
