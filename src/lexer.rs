@@ -122,7 +122,6 @@ pub enum Token {
     Comment,
     OpenParen,
     CloseParen,
-    EOF,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -141,7 +140,6 @@ enum State {
     CommentLine, // The rest of the line is a comment
     Quote,
     EOL,
-    EOF,
 }
 
 impl<'a> Lexer<'a> {
@@ -179,7 +177,7 @@ impl<'a> Lexer<'a> {
                         chars = Some(String::new());
                         self.next();
                     }
-                    None => return Ok(Some(Token::EOF)),
+                    None => return Ok(None),
                     Some(_) => {
                         unimplemented!();
                     }
@@ -259,23 +257,23 @@ impl<'a> Lexer<'a> {
                         self.next();
                     }
                 },
-                State::EOL => {
-                    match ch {
-                        Some('\r') => {
-                            self.next();
-                        }
-                        Some('\n') => {
-                            self.lineno += 1;
-                            self.charno = 0;
-                            self.next();
-                            self.state = State::StartLine;
-                        }
-                        // Shut the compiler up, _ won't ever match
-                        Some(_) | None => {
-                            return Ok(Some(Token::EOF));
-                        }
+                State::EOL => match ch {
+                    Some('\r') => {
+                        self.next();
                     }
-                }
+                    Some('\n') => {
+                        self.lineno += 1;
+                        self.charno = 0;
+                        self.next();
+                        self.state = State::StartLine;
+                    }
+                    Some(_) => {
+                        return Err("Unexpected character found after carriage return");
+                    }
+                    None => {
+                        return Ok(None);
+                    }
+                },
                 _ => {
                     unimplemented!();
                 }
