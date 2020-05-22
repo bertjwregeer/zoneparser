@@ -351,7 +351,7 @@ mod tests {
         let result = lexer.next_token();
 
         // Validate that the result is not an error
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok(), "{:?}", result);
 
         // Since we passed the above assert, unwrap
         return result.unwrap();
@@ -360,7 +360,7 @@ mod tests {
     fn next_token_errors<'a>(lexer: &'a mut Lexer) -> Result<Option<Token>, &'a str> {
         let result = lexer.next_token();
 
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err(), "{:?}", result);
 
         result
     }
