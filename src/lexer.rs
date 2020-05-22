@@ -228,6 +228,48 @@ impl<'a> Lexer<'a> {
                         }));
                     }
                 },
+                State::IncludeFileName => match ch {
+                    Some(ch) if !ch.is_control() && !ch.is_whitespace() && *ch != ';' => {
+                        Self::push_to_str(&mut chars, *ch)?;
+                        self.next();
+                    }
+                    None | Some(_) => {
+                        let file_name = chars.take().unwrap_or_else(|| "".into());
+
+                        if "" == file_name {
+                            return Err("$INCLUDE is missing filename");
+                        }
+                        self.state = State::IncludeDomainName {
+                            file_name: file_name,
+                        };
+                        chars = Some(String::new());
+                        self.next();
+                    }
+                },
+                State::IncludeDomainName { ref file_name } => match ch {
+                    Some(ch) if !ch.is_control() && !ch.is_whitespace() && *ch != ';' => {
+                        Self::push_to_str(&mut chars, *ch)?;
+                        self.next();
+                    }
+                    None | Some(_) => {
+                        // Clone because otherwise we can't take ownership
+                        let file_name = file_name.clone();
+                        let domain_name = chars.take().unwrap_or_else(|| "".into());
+
+                        // We are done processing this line, maybe comment next?
+                        self.state = State::WsOrComment;
+
+                        return Ok(Some(Token::Include {
+                            file_name: file_name.clone(),
+                            domain_name: if domain_name == "" {
+                                None
+                            } else {
+                                Some(domain_name)
+                            },
+                            lineno: self.lineno,
+                        }));
+                    }
+                },
                 State::WsOrComment => match ch {
                     Some(';') => {
                         self.state = State::Comment;
@@ -433,5 +475,57 @@ mod tests {
             next_token_errors(&mut lexer),
             Err("Unexpected character found")
         );
+    }
+
+    #[test]
+    fn include_file_name_only() {
+        let mut lexer = Lexer::new("$INCLUDE file.zone ; this is a comment");
+        assert_eq!(
+            next_token(&mut lexer),
+            Some(Token::Include {
+                file_name: "file.zone".into(),
+                domain_name: None,
+                lineno: 0
+            })
+        );
+        assert_eq!(next_token(&mut lexer), Some(Token::Comment));
+        assert_eq!(
+            next_token(&mut lexer),
+            Some(Token::Text(" this is a comment".into()))
+        );
+        assert_eq!(next_token(&mut lexer), None);
+    }
+
+    #[test]
+    fn include_file_name_domain_name_comment() {
+        let mut lexer = Lexer::new("$INCLUDE file.zone file.zone.; this is a comment");
+        assert_eq!(
+            next_token(&mut lexer),
+            Some(Token::Include {
+                file_name: "file.zone".into(),
+                domain_name: Some("file.zone.".into()),
+                lineno: 0
+            })
+        );
+        assert_eq!(next_token(&mut lexer), Some(Token::Comment));
+        assert_eq!(
+            next_token(&mut lexer),
+            Some(Token::Text(" this is a comment".into()))
+        );
+        assert_eq!(next_token(&mut lexer), None);
+    }
+
+    #[test]
+    fn include_file_name_domain_name() {
+        let mut lexer = Lexer::new("$INCLUDE file.zone file.zone.");
+        assert_eq!(
+            next_token(&mut lexer),
+            Some(Token::Include {
+                file_name: "file.zone".into(),
+                domain_name: Some("file.zone.".into()),
+                lineno: 0
+            })
+        );
+        assert_eq!(next_token(&mut lexer), None);
     }
 }
