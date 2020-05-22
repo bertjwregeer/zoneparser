@@ -128,6 +128,7 @@ pub enum Token {
 #[derive(Clone, PartialEq, Debug)]
 enum State {
     StartLine,
+    RestOfLine, // Parse the reset of the line as normal
     Dollar,
     Origin,
     IncludeFileName,
@@ -136,7 +137,8 @@ enum State {
     DomainName,
     Blank,
     Comment,
-    RestOfLine,
+    WsOrComment, // The only valid thing left is whitespace/comments
+    CommentLine, // The rest of the line is a comment
     Quote,
     EOL,
     EOF,
@@ -202,7 +204,7 @@ impl<'a> Lexer<'a> {
                         } else {
                             return Err("Unknown control entry");
                         }
-                        
+
                         chars = Some(String::new());
                         self.next();
                     }
@@ -216,17 +218,35 @@ impl<'a> Lexer<'a> {
                         self.next();
                     }
                     None | Some('\r') | Some('\n') | Some(_) => {
-                        self.state = State::RestOfLine;
+                        self.state = State::WsOrComment;
                         let domain_name = chars.take().unwrap_or_else(|| "".into());
-                        return Ok(Some(Token::Origin { domain_name: domain_name, lineno: self.lineno }));
+                        return Ok(Some(Token::Origin {
+                            domain_name: domain_name,
+                            lineno: self.lineno,
+                        }));
                     }
-                }
+                },
+                State::WsOrComment => match ch {
+                    Some(';') => {
+                        self.state = State::Comment;
+                        return Ok(Some(Token::Comment));
+                    }
+                    Some(ch) if ch.is_whitespace() => {
+                        self.next();
+                    }
+                    Some('\r') | Some('\n') | None => {
+                        self.state = State::StartLine;
+                    }
+                    Some(_) => {
+                        return Err("Unexpected character found");
+                    }
+                },
                 State::Comment => {
-                    self.state = State::RestOfLine;
+                    self.state = State::CommentLine;
                     chars = Some(String::new());
                     self.next();
                 }
-                State::RestOfLine => match ch {
+                State::CommentLine => match ch {
                     None | Some('\r') | Some('\n') => {
                         self.state = State::EOL;
                         return Ok(Some(Token::Text(chars.take().unwrap_or_else(|| "".into()))));
@@ -269,10 +289,13 @@ impl<'a> Lexer<'a> {
     }
 
     fn push_to_str(chars: &'_ mut Option<String>, ch: char) -> Result<(), &'a str> {
-        chars.as_mut().ok_or_else(|| "chars is None".into()).and_then(|s| {
-            s.push(ch);
-            Ok(())
-        })
+        chars
+            .as_mut()
+            .ok_or_else(|| "chars is None".into())
+            .and_then(|s| {
+                s.push(ch);
+                Ok(())
+            })
     }
 }
 
@@ -336,15 +359,46 @@ mod tests {
     fn origin_only() {
         let zonefile = "$ORIGIN cidr.network.";
         let mut lexer = Lexer::new(zonefile);
-        assert_eq!(lexer.next_token(), Ok(Some(Token::Origin { domain_name: "cidr.network.".into(), lineno: 0 })));
+        assert_eq!(
+            lexer.next_token(),
+            Ok(Some(Token::Origin {
+                domain_name: "cidr.network.".into(),
+                lineno: 0
+            }))
+        );
+        assert_eq!(lexer.next_token(), Ok(Some(Token::EOF)));
     }
 
     #[test]
     fn origin_with_comment() {
         let zonefile = "$ORIGIN cidr.network. ; this is a comment";
         let mut lexer = Lexer::new(zonefile);
-        assert_eq!(lexer.next_token(), Ok(Some(Token::Origin { domain_name: "cidr.network.".into(), lineno: 0 })));
+        assert_eq!(
+            lexer.next_token(),
+            Ok(Some(Token::Origin {
+                domain_name: "cidr.network.".into(),
+                lineno: 0
+            }))
+        );
         assert_eq!(lexer.next_token(), Ok(Some(Token::Comment)));
+        assert_eq!(
+            lexer.next_token(),
+            Ok(Some(Token::Text(" this is a comment".into())))
+        );
+        assert_eq!(lexer.next_token(), Ok(Some(Token::EOF)));
     }
 
+    #[test]
+    fn origin_invalid_data() {
+        let zonefile = "$ORIGIN cidr.network. stray characters";
+        let mut lexer = Lexer::new(zonefile);
+        assert_eq!(
+            lexer.next_token(),
+            Ok(Some(Token::Origin {
+                domain_name: "cidr.network.".into(),
+                lineno: 0
+            }))
+        );
+        assert_eq!(lexer.next_token(), Err("Unexpected character found"));
+    }
 }
