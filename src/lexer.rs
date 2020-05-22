@@ -206,7 +206,7 @@ impl<'a> Lexer<'a> {
                         chars = Some(String::new());
                         self.next();
                     }
-                    None | Some('\r') | Some('\n') | Some(_) => {
+                    None | Some(_) => {
                         return Err("Unexpected end of line");
                     }
                 },
@@ -215,7 +215,7 @@ impl<'a> Lexer<'a> {
                         Self::push_to_str(&mut chars, *ch)?;
                         self.next();
                     }
-                    None | Some('\r') | Some('\n') | Some(_) => {
+                    None | Some(_) => {
                         self.state = State::WsOrComment;
                         let domain_name = chars.take().unwrap_or_else(|| "".into());
                         return Ok(Some(Token::Origin {
@@ -232,8 +232,8 @@ impl<'a> Lexer<'a> {
                     Some(ch) if ch.is_whitespace() => {
                         self.next();
                     }
-                    Some('\r') | Some('\n') | None => {
-                        self.state = State::StartLine;
+                    None | Some('\r') | Some('\n') => {
+                        self.state = State::EOL;
                     }
                     Some(_) => {
                         return Err("Unexpected character found");
