@@ -211,13 +211,17 @@ impl<'a> Lexer<'a> {
                     }
                 },
                 State::Origin => match ch {
-                    Some(ch) if !ch.is_control() && !ch.is_whitespace() => {
+                    Some(ch) if !ch.is_control() && !ch.is_whitespace() && *ch != ';' => {
                         Self::push_to_str(&mut chars, *ch)?;
                         self.next();
                     }
                     None | Some(_) => {
                         self.state = State::WsOrComment;
                         let domain_name = chars.take().unwrap_or_else(|| "".into());
+
+                        if "" == domain_name {
+                            return Err("$ORIGIN is missing domain name");
+                        }
                         return Ok(Some(Token::Origin {
                             domain_name: domain_name,
                             lineno: self.lineno,
