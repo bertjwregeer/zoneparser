@@ -301,6 +301,24 @@ impl<'a> Lexer<'a> {
 mod tests {
     use super::*;
 
+    fn next_token(lexer: &mut Lexer) -> Option<Token> {
+        let result = lexer.next_token();
+
+        // Validate that the result is not an error
+        assert_eq!(result.is_ok(), true);
+
+        // Since we passed the above assert, unwrap
+        return result.unwrap();
+    }
+
+    fn next_token_errors<'a>(lexer: &'a mut Lexer) -> Result<Option<Token>, &'a str> {
+        let result = lexer.next_token();
+
+        assert_eq!(result.is_err(), true);
+
+        result
+    }
+
     #[test]
     fn push_to_str_none() {
         let mut chars: Option<String> = None;
@@ -322,68 +340,78 @@ mod tests {
     fn comment_only() {
         let zonefile = "; this is a comment\n";
         let mut lexer = Lexer::new(zonefile);
-        assert_eq!(lexer.next_token(), Ok(Some(Token::Comment)));
+        assert_eq!(next_token(&mut lexer), Some(Token::Comment));
         assert_eq!(
-            lexer.next_token(),
-            Ok(Some(Token::Text(" this is a comment".into())))
+            next_token(&mut lexer),
+            Some(Token::Text(" this is a comment".into()))
         );
-        assert_eq!(lexer.next_token(), Ok(Some(Token::EOF)));
+        assert_eq!(next_token(&mut lexer), None);
     }
 
     #[test]
     fn multiple_comment() {
         let zonefile = "; this is a comment\n; this is another comment";
         let mut lexer = Lexer::new(zonefile);
-        assert_eq!(lexer.next_token(), Ok(Some(Token::Comment)));
+        assert_eq!(next_token(&mut lexer), Some(Token::Comment));
         assert_eq!(
-            lexer.next_token(),
-            Ok(Some(Token::Text(" this is a comment".into())))
+            next_token(&mut lexer),
+            Some(Token::Text(" this is a comment".into()))
         );
-        assert_eq!(lexer.next_token(), Ok(Some(Token::Comment)));
+        assert_eq!(next_token(&mut lexer), Some(Token::Comment));
         assert_eq!(
-            lexer.next_token(),
-            Ok(Some(Token::Text(" this is another comment".into())))
+            next_token(&mut lexer),
+            Some(Token::Text(" this is another comment".into()))
         );
+        assert_eq!(next_token(&mut lexer), None);
     }
 
     #[test]
-    fn whitespace() {
-        let zonefile = "\r\n\r\n";
-        let mut lexer = Lexer::new(zonefile);
-        assert_eq!(lexer.next_token(), Ok(Some(Token::EOF)));
+    fn carriagereturn_newlines() {
+        assert_eq!(next_token(&mut Lexer::new("\r\n\r\n")), None);
+    }
+
+    #[test]
+    fn newlines() {
+        assert_eq!(next_token(&mut Lexer::new("\n\n")), None);
+    }
+
+    #[test]
+    fn carriagereturn_no_nl() {
+        assert_eq!(
+            next_token_errors(&mut Lexer::new("\rtest")),
+            Err("Unexpected character found after carriage return")
+        );
     }
 
     #[test]
     fn origin_only() {
-        let zonefile = "$ORIGIN cidr.network.";
-        let mut lexer = Lexer::new(zonefile);
+        let mut lexer = Lexer::new("$ORIGIN cidr.network.");
         assert_eq!(
-            lexer.next_token(),
-            Ok(Some(Token::Origin {
+            next_token(&mut lexer),
+            Some(Token::Origin {
                 domain_name: "cidr.network.".into(),
                 lineno: 0
-            }))
+            })
         );
-        assert_eq!(lexer.next_token(), Ok(Some(Token::EOF)));
+        assert_eq!(next_token(&mut lexer), None);
     }
 
     #[test]
     fn origin_with_comment() {
-        let zonefile = "$ORIGIN cidr.network. ; this is a comment";
-        let mut lexer = Lexer::new(zonefile);
+        let mut lexer = Lexer::new("$ORIGIN cidr.network. ; this is a comment");
         assert_eq!(
-            lexer.next_token(),
-            Ok(Some(Token::Origin {
+            next_token(&mut lexer),
+            Some(Token::Origin {
                 domain_name: "cidr.network.".into(),
                 lineno: 0
-            }))
+            })
         );
-        assert_eq!(lexer.next_token(), Ok(Some(Token::Comment)));
+        assert_eq!(next_token(&mut lexer), Some(Token::Comment));
         assert_eq!(
-            lexer.next_token(),
-            Ok(Some(Token::Text(" this is a comment".into())))
+            next_token(&mut lexer),
+            Some(Token::Text(" this is a comment".into()))
         );
-        assert_eq!(lexer.next_token(), Ok(Some(Token::EOF)));
+        assert_eq!(next_token(&mut lexer), None);
     }
 
     #[test]
@@ -391,12 +419,15 @@ mod tests {
         let zonefile = "$ORIGIN cidr.network. stray characters";
         let mut lexer = Lexer::new(zonefile);
         assert_eq!(
-            lexer.next_token(),
-            Ok(Some(Token::Origin {
+            next_token(&mut lexer),
+            Some(Token::Origin {
                 domain_name: "cidr.network.".into(),
                 lineno: 0
-            }))
+            })
         );
-        assert_eq!(lexer.next_token(), Err("Unexpected character found"));
+        assert_eq!(
+            next_token_errors(&mut lexer),
+            Err("Unexpected character found")
+        );
     }
 }
