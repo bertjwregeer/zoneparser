@@ -332,7 +332,7 @@ impl<'a> Lexer<'a> {
         self.charno += 1;
     }
 
-    fn push_to_str(chars: &'_ mut Option<String>, ch: char) -> Result<(), &'a str> {
+    fn push_to_str(chars: &mut Option<String>, ch: char) -> Result<(), &'static str> {
         chars
             .as_mut()
             .ok_or_else(|| "chars is None".into())
