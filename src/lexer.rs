@@ -186,7 +186,7 @@ impl<'a> Lexer<'a> {
                     Some(ch) if ch.is_control() => {
                         return Err("Unexpected control character found");
                     }
-                    Some(ch) if !ch.is_whitespace() => {
+                    Some(ch) if !ch.is_whitespace() && *ch != ';' => {
                         Self::push_to_str(&mut chars, *ch)?;
                         self.next();
                     }
@@ -207,7 +207,7 @@ impl<'a> Lexer<'a> {
                         self.next();
                     }
                     None | Some(_) => {
-                        return Err("Unexpected end of line");
+                        return Err("Unexpected end of control line");
                     }
                 },
                 State::Origin => match ch {
@@ -527,5 +527,12 @@ mod tests {
             })
         );
         assert_eq!(next_token(&mut lexer), None);
+    }
+
+    #[test]
+    fn origin_missing_domain_comment_follows() {
+        let mut lexer = Lexer::new("$ORIGIN; this comment unexpectedly ends the control line");
+        assert_eq!(
+            next_token_errors(&mut lexer), Err("Unexpected end of control line"))
     }
 }
