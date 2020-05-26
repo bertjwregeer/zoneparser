@@ -270,6 +270,19 @@ impl<'a> Lexer<'a> {
                         }));
                     }
                 },
+                State::Ttl => match ch {
+                    Some(ch) if !ch.is_whitespace() && !ch.is_control() && *ch != ';' => {
+                        Self::push_to_str(&mut chars, *ch)?;
+                        self.next();
+                    }
+                    None | Some(_) => {
+                        // Parse out the TTL here
+                        let ttl = Self::parse_ttl(&chars)?;
+                        self.state = State::WsOrComment;
+
+                        return Ok(Some(Token::TTL { ttl: ttl, lineno: self.lineno }));
+                    }
+                },
                 State::WsOrComment => match ch {
                     Some(';') => {
                         self.state = State::Comment;
@@ -624,6 +637,35 @@ mod tests {
             next_token_errors(&mut lexer),
             Err("Unexpected end of control line")
         )
+    }
+
+    #[test]
+    fn control_ttl() {
+        let mut lexer = Lexer::new("$TTL 60m");
+        assert_eq!(
+            next_token(&mut lexer),
+            Some(Token::TTL { ttl: 60 * 60, lineno: 0})
+        );
+    }
+
+    #[test]
+    fn control_ttl_invalid() {
+        let mut lexer = Lexer::new("$TTL ; invalid");
+        assert_eq!(next_token_errors(&mut lexer), Err("TTL to parse is empty string"));
+    }
+
+    #[test]
+    fn control_ttl_invalid_number() {
+        let mut lexer = Lexer::new("$TTL 45834534854385438; invalid");
+        assert_eq!(next_token_errors(&mut lexer), Err("Unable to parse TTL as i32"));
+    }
+
+    #[test]
+    fn control_ttl_comment() {
+        let mut lexer = Lexer::new("$TTL 60m; valid");
+        assert_eq!(next_token(&mut lexer), Some(Token::TTL { ttl: 60 * 60, lineno: 0 }));
+        assert_eq!(next_token(&mut lexer), Some(Token::Comment(" valid".into())));
+        assert_eq!(next_token(&mut lexer), None);
     }
 
     #[test]
