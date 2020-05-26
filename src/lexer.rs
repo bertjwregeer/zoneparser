@@ -119,7 +119,7 @@ pub enum Token {
     },
     Text(String),
     DomainName(String),
-    Comment,
+    Comment(String),
     OpenParen,
     CloseParen,
 }
@@ -137,7 +137,6 @@ enum State {
     Blank,
     Comment,
     WsOrComment, // The only valid thing left is whitespace/comments
-    CommentLine, // The rest of the line is a comment
     Quote,
     EOL,
 }
@@ -170,7 +169,8 @@ impl<'a> Lexer<'a> {
                     }
                     Some(';') => {
                         self.state = State::Comment;
-                        return Ok(Some(Token::Comment));
+                        chars = Some(String::new());
+                        self.next();
                     }
                     Some('$') => {
                         self.state = State::Dollar;
@@ -273,7 +273,8 @@ impl<'a> Lexer<'a> {
                 State::WsOrComment => match ch {
                     Some(';') => {
                         self.state = State::Comment;
-                        return Ok(Some(Token::Comment));
+                        chars = Some(String::new());
+                        self.next();
                     }
                     Some(ch) if ch.is_whitespace() => {
                         self.next();
@@ -285,15 +286,12 @@ impl<'a> Lexer<'a> {
                         return Err("Unexpected character found");
                     }
                 },
-                State::Comment => {
-                    self.state = State::CommentLine;
-                    chars = Some(String::new());
-                    self.next();
-                }
-                State::CommentLine => match ch {
+                State::Comment => match ch {
                     None | Some('\r') | Some('\n') => {
                         self.state = State::EOL;
-                        return Ok(Some(Token::Text(chars.take().unwrap_or_else(|| "".into()))));
+                        return Ok(Some(Token::Comment(
+                            chars.take().unwrap_or_else(|| "".into()),
+                        )));
                     }
                     Some(ch) if ch.is_control() => {
                         return Err("Unexpected control character found");
@@ -386,10 +384,9 @@ mod tests {
     fn comment_only() {
         let zonefile = "; this is a comment\n";
         let mut lexer = Lexer::new(zonefile);
-        assert_eq!(next_token(&mut lexer), Some(Token::Comment));
         assert_eq!(
             next_token(&mut lexer),
-            Some(Token::Text(" this is a comment".into()))
+            Some(Token::Comment(" this is a comment".into()))
         );
         assert_eq!(next_token(&mut lexer), None);
     }
@@ -398,15 +395,13 @@ mod tests {
     fn multiple_comment() {
         let zonefile = "; this is a comment\n; this is another comment";
         let mut lexer = Lexer::new(zonefile);
-        assert_eq!(next_token(&mut lexer), Some(Token::Comment));
         assert_eq!(
             next_token(&mut lexer),
-            Some(Token::Text(" this is a comment".into()))
+            Some(Token::Comment(" this is a comment".into()))
         );
-        assert_eq!(next_token(&mut lexer), Some(Token::Comment));
         assert_eq!(
             next_token(&mut lexer),
-            Some(Token::Text(" this is another comment".into()))
+            Some(Token::Comment(" this is another comment".into()))
         );
         assert_eq!(next_token(&mut lexer), None);
     }
@@ -452,10 +447,9 @@ mod tests {
                 lineno: 0
             })
         );
-        assert_eq!(next_token(&mut lexer), Some(Token::Comment));
         assert_eq!(
             next_token(&mut lexer),
-            Some(Token::Text(" this is a comment".into()))
+            Some(Token::Comment(" this is a comment".into()))
         );
         assert_eq!(next_token(&mut lexer), None);
     }
@@ -488,10 +482,9 @@ mod tests {
                 lineno: 0
             })
         );
-        assert_eq!(next_token(&mut lexer), Some(Token::Comment));
         assert_eq!(
             next_token(&mut lexer),
-            Some(Token::Text(" this is a comment".into()))
+            Some(Token::Comment(" this is a comment".into()))
         );
         assert_eq!(next_token(&mut lexer), None);
     }
@@ -507,10 +500,9 @@ mod tests {
                 lineno: 0
             })
         );
-        assert_eq!(next_token(&mut lexer), Some(Token::Comment));
         assert_eq!(
             next_token(&mut lexer),
-            Some(Token::Text(" this is a comment".into()))
+            Some(Token::Comment(" this is a comment".into()))
         );
         assert_eq!(next_token(&mut lexer), None);
     }
