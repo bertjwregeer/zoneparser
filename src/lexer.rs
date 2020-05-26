@@ -339,6 +339,93 @@ impl<'a> Lexer<'a> {
                 Ok(())
             })
     }
+
+    fn parse_ttl(chars: &Option<String>) -> Result<i32, &'static str> {
+        match chars {
+            None => {
+                return Err("chars is None");
+            }
+            Some(_) => {}
+        }
+        let ttl_text = chars.as_ref().unwrap();
+
+        if ttl_text == "" {
+            return Err("TTL to parse is empty string");
+        }
+
+        fn multiplier(val: i32, ch: char) -> Result<i32, &'static str> {
+            return match ch {
+                's' | 'S' => {
+                    // Seconds
+                    Ok(val * 1)
+                }
+                'm' | 'M' => {
+                    // Minutes
+                    Ok(val * 60)
+                }
+                'h' | 'H' => {
+                    // Hours
+                    Ok(val * 3600)
+                }
+                'd' | 'D' => {
+                    // Days
+                    Ok(val * 86400)
+                }
+                'w' | 'W' => {
+                    // Weeks
+                    Ok(val * 604800)
+                }
+                _ => Err("Unknown multiplier for TTL"),
+            };
+        }
+
+        let mut ttl: i32 = 0;
+        let mut chars = Some(String::new());
+
+        for ch in ttl_text.chars() {
+            match ch {
+                '0'..='9' => {
+                    Self::push_to_str(&mut chars, ch)?;
+                }
+                ch @ 'A'..='Z' | ch @ 'a'..='z' => {
+                    let ttl_num = chars.take().unwrap();
+
+                    if ttl_num == "" {
+                        return Err("TTL contains unexpected multiplier");
+                    }
+
+                    if let Ok(ttl_num) = ttl_num.parse() {
+                        ttl += multiplier(ttl_num, ch)?;
+                    } else {
+                        return Err("Unable to parse TTL as i32");
+                    }
+
+                    // Make sure to reset the buffer
+                    chars = Some(String::new());
+                }
+                _ => {
+                    return Err("Invalid characters in TTL");
+                }
+            }
+        }
+
+        let ttl_num = chars.take().unwrap();
+
+        if ttl_num != "" {
+            if let Ok(ttl_num) = ttl_num.parse::<i32>() {
+                ttl += ttl_num;
+            } else {
+                return Err("Unable to parse TTL as i32");
+            }
+        }
+
+        // See RFC 2181 section 8 - Time to Live (TTL)
+        if ttl < 0 {
+            return Err("TTL is a negative value");
+        }
+
+        Ok(ttl)
+    }
 }
 
 #[cfg(test)]
@@ -537,5 +624,56 @@ mod tests {
             next_token_errors(&mut lexer),
             Err("Unexpected end of control line")
         )
+    }
+
+    #[test]
+    fn test_ttl_numbers() {
+        assert_eq!(Lexer::parse_ttl(&Some("60".into())), Ok(60));
+    }
+
+    #[test]
+    fn test_ttl_number_seconds() {
+        assert_eq!(Lexer::parse_ttl(&Some("60s".into())), Ok(60));
+    }
+
+    #[test]
+    fn test_ttl_number_minutes() {
+        assert_eq!(Lexer::parse_ttl(&Some("60m".into())), Ok(3600));
+    }
+
+    #[test]
+    fn test_ttl_number_days() {
+        assert_eq!(Lexer::parse_ttl(&Some("60d".into())), Ok(5184000));
+    }
+
+    #[test]
+    fn test_ttl_number_days_minutes() {
+        assert_eq!(Lexer::parse_ttl(&Some("1d10m".into())), Ok(86400 + (10 * 60)));
+    }
+
+    #[test]
+    fn test_ttl_number_minutes_days() {
+        // Bit silly to write this... but whatever
+        assert_eq!(Lexer::parse_ttl(&Some("10m1d".into())), Ok(86400 + (10 * 60)));
+    }
+
+    #[test]
+    fn test_ttl_not_a_number() {
+        assert_eq!(Lexer::parse_ttl(&Some("a".into())), Err("TTL contains unexpected multiplier"));
+    }
+
+    #[test]
+    fn test_ttl_empty() {
+        assert_eq!(Lexer::parse_ttl(&Some("".into())), Err("TTL to parse is empty string"));
+    }
+
+    #[test]
+    fn test_ttl_none() {
+        assert_eq!(Lexer::parse_ttl(&None), Err("chars is None"));
+    }
+
+    #[test]
+    fn test_ttl_extra_multiplier() {
+        assert_eq!(Lexer::parse_ttl(&Some("10dd".into())), Err("TTL contains unexpected multiplier"));
     }
 }
