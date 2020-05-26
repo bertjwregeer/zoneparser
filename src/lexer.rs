@@ -522,9 +522,20 @@ mod tests {
     }
 
     #[test]
+    fn include_missing_filename() {
+        let mut lexer = Lexer::new("$INCLUDE ;include stuff");
+        assert_eq!(
+            next_token_errors(&mut lexer),
+            Err("$INCLUDE is missing filename")
+        );
+    }
+
+    #[test]
     fn origin_missing_domain_comment_follows() {
         let mut lexer = Lexer::new("$ORIGIN; this comment unexpectedly ends the control line");
         assert_eq!(
-            next_token_errors(&mut lexer), Err("Unexpected end of control line"))
+            next_token_errors(&mut lexer),
+            Err("Unexpected end of control line")
+        )
     }
 }
